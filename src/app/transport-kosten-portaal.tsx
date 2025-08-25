@@ -2,13 +2,16 @@
 
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { Upload, Calculator, Info, Settings, Truck } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
+// Next.js serves static files from the public directory
+const defaultExcel = "/gpt.xlsx";
 
 // ------------------------------------------------------------
 // Transportkosten Portaal – Staffeltarief (vast bedrag per levering)
@@ -34,6 +37,35 @@ export default function TransportkostenPortaal() {
   const [result, setResult] = useState(null);
 
   const nf = useMemo(() => new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR" }), []);
+
+  // Load the default Excel file on mount
+  useEffect(() => {
+    async function fetchDefaultExcel() {
+      try {
+        const response = await fetch(defaultExcel);
+        if (!response.ok) throw new Error("Kon het standaard Excel-bestand niet laden.");
+        const arrayBuffer = await response.arrayBuffer();
+        const data = new Uint8Array(arrayBuffer);
+        const wb = XLSX.read(data, { type: "array" });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const json = XLSX.utils.sheet_to_json(ws, { defval: "" });
+        if (!json.length) {
+          setMessage("Het standaardbestand lijkt geen rijen te bevatten.");
+          setRows([]);
+          setColumns([]);
+          return;
+        }
+        setRows(json);
+        setColumns(Object.keys(json[0]));
+        setMessage("");
+      } catch (err) {
+        console.error(err);
+        setMessage("Kon het standaard Excel-bestand niet laden.");
+      }
+    }
+    fetchDefaultExcel();
+  }, []);
 
   function onFile(e) {
     const file = e.target.files?.[0];
@@ -172,6 +204,9 @@ export default function TransportkostenPortaal() {
             <CardContent className="grid gap-4">
               <Input type="file" accept=".xlsx,.xls,.csv" onChange={onFile} />
               {message && <div className="text-sm text-red-600 flex items-center gap-2"><Info className="h-4 w-4" />{message}</div>}
+              <div className="text-xs text-neutral-500">
+                Standaardbestand geladen: <code>gpt.xlsx</code> uit public folder
+              </div>
             </CardContent>
           </Card>
 
